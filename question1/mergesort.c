@@ -7,16 +7,9 @@
 
 typedef struct __element {
     char *value;
-    struct __element *next;
     struct list_head list;
 } list_ele_t;
 
-/* typedef struct { */
-/*     list_ele_t *head; /1* Linked list of elements *1/ */
-/*     list_ele_t *tail; */
-/*     size_t size; */
-/*     struct list_head list; */
-/* } queue_t; */
 
 static list_ele_t *get_middle(struct list_head *list)
 {
@@ -53,22 +46,6 @@ static void list_merge(struct list_head *lhs,
     list_splice_tail(list_empty(lhs) ? rhs : lhs, head);
 }
 
-/* void list_merge_sort(queue_t *q) */
-/* { */
-/*     if (list_is_singular(&q->list)) */
-/*         return; */
-
-/*     queue_t left; */
-/*     struct list_head sorted; */
-/*     INIT_LIST_HEAD(&left.list); */
-/*     list_cut_position(&left.list, &q->list, &get_middle(&q->list)->list); */
-/*     list_merge_sort(&left); */
-/*     list_merge_sort(q); */
-/*     list_merge(&left.list, &q->list, &sorted); */
-/*     INIT_LIST_HEAD(&q->list); */
-/*     list_splice_tail(&sorted, &q->list); */
-/* } */
-
 
 void list_merge_sort(list_ele_t *head)
 {
@@ -86,19 +63,6 @@ void list_merge_sort(list_ele_t *head)
     list_splice_tail(&sorted, &head->list);
 }
 
-/* static bool validate(queue_t *q) */
-/* { */
-/*     struct list_head *node; */
-/*     list_for_each (node, &q->list) { */
-/*         if (node->next == &q->list) */
-/*             break; */
-/*         if (strcmp(list_entry(node, list_ele_t, list)->value, */
-/*                    list_entry(node->next, list_ele_t, list)->value) > 0) */
-/*             return false; */
-/*     } */
-/*     return true; */
-/* } */
-
 static bool validate(list_ele_t *head)
 {
     struct list_head *node;
@@ -112,32 +76,25 @@ static bool validate(list_ele_t *head)
     return true;
 }
 
-/* static queue_t *q_new() */
-/* { */
-/*     queue_t *q = malloc(sizeof(queue_t)); */
-/*     if (!q) return NULL; */
 
-/*     q->head = q->tail = NULL; */
-/*     q->size = 0; */
-/*     INIT_LIST_HEAD(&q->list); */
-/*     return q; */
-/* } */
-
-static void q_free(list_ele_t *head)
+static void list_free(list_ele_t *head)
 {
-    if (!head) return;
 
-    list_ele_t *current = head->next;
-    while (current->next != head) {
-        list_ele_t *tmp = current;
-        current = current->next;
-        free(tmp->value);
-        free(tmp);
+    struct list_head *cur;
+    list_ele_t *element;
+    list_for_each(cur, &head->list){
+        element = list_entry(cur, list_ele_t, list);
+        free(element->value);
+        free(element);
+        element = NULL;
     }
+    
+    free(head->value);
     free(head);
+    head = NULL;
 }
 
-bool q_insert_head(list_ele_t *head, char *s)
+bool list_insert(list_ele_t *head, char *s)
 {
 
     list_ele_t *newh = malloc(sizeof(list_ele_t));
@@ -169,20 +126,20 @@ int main(void)
     }
 
     list_ele_t *head = malloc(sizeof(list_ele_t));
-    head->value = "";
+    head->value = NULL;
     struct list_head list;
     head->list = list;
     INIT_LIST_HEAD(&head->list);
 
     char buf[256];
     while (fgets(buf, 256, fp))
-        q_insert_head(head, buf);
+        list_insert(head, buf);
     fclose(fp);
 
     list_merge_sort(head);
     assert(validate(head));
 
-    /* q_free(head); */
+    list_free(head);
 
     printf("done!\n");
     return 0;
