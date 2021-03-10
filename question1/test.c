@@ -2,7 +2,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "list.h"
+#include <string.h>
+#include "queue.h"
+#include "mergesort.h"
 
 static bool validate(queue_t *q)
 {
