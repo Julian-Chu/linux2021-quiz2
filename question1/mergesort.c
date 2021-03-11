@@ -76,14 +76,18 @@ static bool validate(list_ele_t *head)
     return true;
 }
 
+#define list_for_each_safe(pos, n, head) \
+    for (pos = (head)->next, n = pos->next; pos != (head); \
+        pos = n, n = pos->next)
 
 static void list_free(list_ele_t *head)
 {
 
-    struct list_head *cur;
+    struct list_head *cur, *tmp;
     list_ele_t *element;
-    list_for_each(cur, &head->list){
+    list_for_each_safe(cur, tmp,  &head->list){
         element = list_entry(cur, list_ele_t, list);
+        list_del(cur);
         free(element->value);
         free(element);
         element = NULL;
