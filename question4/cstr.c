@@ -113,27 +113,6 @@ static cstring interning(struct __cstr_interning *si, const char *cstr,
   return cs;
 }
 
-static cstring cstr_interning(const char *cstr, size_t sz, uint32_t hash) {
-  cstring ret;
-  CSTR_LOCK();
-  ret = interning(&__cstr_ctx, cstr, sz, hash);
-  if (!ret) {
-    expand(&__cstr_ctx);
-    ret = interning(&__cstr_ctx, cstr, sz, hash);
-  }
-  ++__cstr_ctx.total;
-  CSTR_UNLOCK();
-  return ret;
-}
-
-static inline uint32_t hash_blob(const char *buffer, size_t len) {
-  const uint8_t *ptr = (const uint8_t *)buffer;
-  size_t h = len;
-  size_t step = (len >> 5) + 1;
-  for (size_t i = len; i >= step; i -= step)
-    h = h ^ ((h << 5) + (h >> 2) + ptr[i - 1]);
-  return h == 0 ? 1 : h;
-}
 
 static cstring cstr_interning(const char *cstr, size_t sz, uint32_t hash) {
   cstring ret;
@@ -157,11 +136,42 @@ static inline uint32_t hash_blob(const char *buffer, size_t len) {
   return h == 0 ? 1 : h;
 }
 
-void cstr_release(cstring s) {
-  if (s->type || !s->ref)
-    return;
-  if (__sync_sub_and_fetch(&s->ref, 1) == 0)
-    free(s);
+cstring cstr_clone(const char *cstr, size_t sz)
+{
+    if (sz < CSTR_INTERNING_SIZE)
+        return cstr_interning(cstr, sz, hash_blob(cstr, sz));
+    cstring p = xalloc(sizeof(struct __cstr_data) + sz + 1);
+    if (!p)
+        return NULL;
+    void *ptr = (void *) (p + 1);
+    p->cstr = ptr;
+    p->type = 0;
+    p->ref = 1;
+    memcpy(ptr, cstr, sz);
+    ((char *) ptr)[sz] = 0;
+    p->hash_size = 0;
+    return p;
+}
+
+cstring cstr_grab(cstring s)
+{
+    if (s->type & (CSTR_PERMANENT | CSTR_INTERNING))
+        return s;
+    if (s->type == CSTR_ONSTACK)
+        return cstr_clone(s->cstr, s->hash_size);
+    if (s->ref == 0)
+        s->type = CSTR_PERMANENT;
+    else
+        __sync_add_and_fetch(&s->ref, 1);
+    return s;
+}
+
+void cstr_release(cstring s)
+{
+    if (s->type || !s->ref)
+        return;
+    if (__sync_sub_and_fetch(&s->ref, 1) == 0)
+        free(s);
 }
 
 static size_t cstr_hash(cstring s) {
@@ -216,7 +226,7 @@ static cstring cstr_cat2(const char *a, const char *b) {
 cstring cstr_cat(cstr_buffer sb, const char *str) {
   cstring s = sb->str;
   if (s->type == CSTR_ONSTACK) {
-    /* int i = CCC;  strlen(s->cstr)+1 */
+    int i = s->hash_size;
     while (i < CSTR_STACK_SIZE - 1) {
       s->cstr[i] = *str;
       if (*str == 0)
